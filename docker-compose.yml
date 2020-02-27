@@ -1,0 +1,27 @@
+version: '3'
+
+networks:
+  default:
+    driver: bridge
+
+services:
+  info:
+    container_name: 'Info'
+    build: 'info/'
+    ports:
+      - '0.0.0.0:8334:8334'
+    networks:
+      - default
+
+  route_finder:
+    container_name: 'RouteFinder'
+    build: 'route_finder/'
+    ports:
+      - '0.0.0.0:8000:8000'
+    networks:
+      - default
+    environment:
+      DEBUG: 'False'
+
+  redis:
+    image: "redis:alpine"
