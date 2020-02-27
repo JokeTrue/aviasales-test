@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from envparse import env
 
 DEBUG = env.bool('DEBUG', default=True)
@@ -14,3 +16,5 @@ OPTIMAL = 'optimal'
 ALLOWED_MODES = [FASTEST, SLOWEST, CHEAPEST, EXPENSIVE]
 
 ROUTE_CACHE_KEY = '{source}_{destination}_{mode}'
+
+MAX_TIME_BETWEEN_FLIGHTS = timedelta(hours=12).total_seconds()

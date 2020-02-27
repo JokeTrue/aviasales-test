@@ -11,3 +11,8 @@ class NoRoutesLeft(Exception):
 class WrongIncomeData(Exception):
     '''Wrong income params'''
     pass
+
+
+class WrongRoute(Exception):
+    '''Wrong route'''
+    pass

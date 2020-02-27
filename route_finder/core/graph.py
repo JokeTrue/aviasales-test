@@ -1,11 +1,14 @@
 import abc
+from collections import OrderedDict
 from collections import defaultdict
+from datetime import timedelta
 from queue import PriorityQueue
 from typing import List, Union, Dict, Any
 
 from data_classes import Flight, Route
-from exceptions import NoRoutesLeft
+from exceptions import NoRoutesLeft, WrongRoute
 from geo import distance, get_airport_coordinates
+from settings import MAX_TIME_BETWEEN_FLIGHTS
 
 
 class SimpleGraph(abc.ABC):
@@ -44,12 +47,24 @@ class AirportsGraph(SimpleGraph):
         raise NotImplementedError
 
     @staticmethod
-    def _get_best_options(flights: List[Flight], exclude_flights: List[Flight] = None) -> List[Flight]:
+    def _get_best_options(
+            flights: List[Flight],
+            came_from_flight: Flight,
+            exclude_flights: List[Flight] = None,
+    ) -> List[Flight]:
         if exclude_flights is None:
             exclude_flights = []
 
         best_flight_options = {}
         filtered_flights = [item for item in flights if item not in exclude_flights]
+
+        if came_from_flight:
+            filtered_flights = list(
+                filter(
+                    lambda f: 0 < (f.departure - came_from_flight.arrival).total_seconds() <= MAX_TIME_BETWEEN_FLIGHTS,
+                    filtered_flights,
+                ),
+            )
 
         for flight in filtered_flights:
             if (
@@ -62,7 +77,11 @@ class AirportsGraph(SimpleGraph):
 
     @staticmethod
     def _reconstruct_path(came_from: Dict[str, Any], source: str, destination: str) -> List[Flight]:
-        flight = came_from[destination]
+        try:
+            flight = came_from[destination]
+        except KeyError:
+            raise WrongRoute()
+
         path = [flight]
 
         while flight.source != source:
@@ -75,7 +94,7 @@ class AirportsGraph(SimpleGraph):
         q = PriorityQueue()
         q.put((0, source))
 
-        came_from = {}
+        came_from = OrderedDict()
         cost_so_far = {source: 0}
 
         while not q.empty():
@@ -84,7 +103,12 @@ class AirportsGraph(SimpleGraph):
             if current_airport == destination:
                 break
 
-            best_options = self._get_best_options(self.neighbors(current_airport), exclude_flights)
+            last_flight_from = list(came_from.values())
+            best_options = self._get_best_options(
+                flights=self.neighbors(current_airport),
+                came_from_flight=last_flight_from[-1] if last_flight_from else None,
+                exclude_flights=exclude_flights,
+            )
             for flight in best_options:
                 new_cost = cost_so_far[current_airport] + self.get_priority_value(flight)
 
@@ -111,14 +135,17 @@ class AirportsGraph(SimpleGraph):
         while True:
             try:
                 result = self._search(source, destination, exclude_flights=exclude_flights)
-            except NoRoutesLeft:
+            except (NoRoutesLeft, WrongRoute):
                 break
+            else:
+                routes.append(result)
+                exclude_flights += result
 
-            routes.append(result)
-            exclude_flights += result
-
-        unique_routes = [Route(flights) for flights in set(tuple(flights) for flights in routes)]
-        sorted_routes = self.sort_routes(unique_routes)
+        filtered_routes = [
+            route for route in [Route(tuple(flights)) for flights in routes]
+            if route.arrival - route.departure <= timedelta(days=1)
+        ]
+        sorted_routes = self.sort_routes(filtered_routes)
         return sorted_routes
 
 
