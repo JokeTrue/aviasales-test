@@ -3,35 +3,39 @@ from collections import OrderedDict
 from collections import defaultdict
 from datetime import timedelta
 from queue import PriorityQueue
-from typing import List, Union, Dict, Any
+from typing import List, Union, Dict, Any, TypeVar
 
 from data_classes import Flight, Route
 from exceptions import NoRoutesLeft, WrongRoute
 from geo import distance, get_airport_coordinates
 from settings import MAX_TIME_BETWEEN_FLIGHTS
 
+T = TypeVar('T')  # Any type.
+KT = TypeVar('KT')  # Key type.
+
 
 class SimpleGraph(abc.ABC):
-    def __init__(self, edges):
+    def __init__(self, edges: Dict[KT, T]):
         self.edges = edges
 
-    def neighbors(self, key) -> List:
+    def neighbors(self, key: KT) -> List[T]:
         return self.edges[key]
 
-    def heuristic(self, from_node, to_node) -> Union[int, float]:
+    def heuristic(self, from_node: KT, to_node: KT) -> Union[int, float]:
         raise NotImplementedError
 
-    def _search(self, source: str, destination: str) -> List[Flight]:
+    def _search(self, source: KT, destination: KT) -> List[T]:
         raise NotImplementedError
 
 
 class AirportsGraph(SimpleGraph):
-    def __init__(self, edges, airports: Dict, reverse=False):
+    def __init__(self, edges, airports, reverse=False):
+        super().__init__(edges)
         self.reverse = reverse
         self.airports_data = airports
 
         flights = defaultdict(set)
-        for flight in edges:
+        for flight in self.edges:
             flights[flight.source].add(flight)
 
         self.edges = flights
@@ -43,7 +47,7 @@ class AirportsGraph(SimpleGraph):
         return distance(from_coords, to_coords)
 
     @staticmethod
-    def get_priority_value(obj: Flight):
+    def get_priority_value(obj: Flight) -> Any:
         raise NotImplementedError
 
     @staticmethod
@@ -76,7 +80,7 @@ class AirportsGraph(SimpleGraph):
         return list(best_flight_options.values())
 
     @staticmethod
-    def _reconstruct_path(came_from: Dict[str, Any], source: str, destination: str) -> List[Flight]:
+    def _reconstruct_path(came_from: Dict[KT, T], source: KT, destination: KT) -> List[Flight]:
         try:
             flight = came_from[destination]
         except KeyError:
@@ -90,7 +94,7 @@ class AirportsGraph(SimpleGraph):
 
         return path
 
-    def _search(self, source: str, destination: str, exclude_flights=None) -> List[Flight]:
+    def _search(self, source: KT, destination: KT, exclude_flights=None) -> List[Flight]:
         q = PriorityQueue()
         q.put((0, source))
 
@@ -103,10 +107,10 @@ class AirportsGraph(SimpleGraph):
             if current_airport == destination:
                 break
 
-            last_flight_from = list(came_from.values())
+            last_flights = list(came_from.values())
             best_options = self._get_best_options(
                 flights=self.neighbors(current_airport),
-                came_from_flight=last_flight_from[-1] if last_flight_from else None,
+                came_from_flight=last_flights[-1] if last_flights else None,
                 exclude_flights=exclude_flights,
             )
             for flight in best_options:
@@ -125,10 +129,10 @@ class AirportsGraph(SimpleGraph):
         else:
             raise NoRoutesLeft()
 
-    def sort_routes(self, routes: List[Route]) -> List[Route]:
+    def _sort_routes(self, routes: List[Route]) -> List[Route]:
         raise NotImplementedError
 
-    def get_routes(self, source: str, destination: str):
+    def get_routes(self, source: KT, destination: KT) -> List[Route]:
         routes = []
         exclude_flights = []
 
@@ -145,23 +149,23 @@ class AirportsGraph(SimpleGraph):
             route for route in [Route(tuple(flights)) for flights in routes]
             if route.arrival - route.departure <= timedelta(days=1)
         ]
-        sorted_routes = self.sort_routes(filtered_routes)
+        sorted_routes = self._sort_routes(filtered_routes)
         return sorted_routes
 
 
 class DurationBasedGraph(AirportsGraph):
     @staticmethod
-    def get_priority_value(obj: Flight):
+    def get_priority_value(obj: Flight) -> Any:
         return obj.duration
 
-    def sort_routes(self, routes: List[Route]) -> List[Route]:
+    def _sort_routes(self, routes: List[Route]) -> List[Route]:
         return sorted(routes, key=lambda r: (r.departure, r.total_duration), reverse=self.reverse)
 
 
 class PriceBasedGraph(AirportsGraph):
     @staticmethod
-    def get_priority_value(obj: Flight):
+    def get_priority_value(obj: Flight) -> Any:
         return float(obj.price.amount)
 
-    def sort_routes(self, routes: List[Route]) -> List[Route]:
+    def _sort_routes(self, routes: List[Route]) -> List[Route]:
         return sorted(routes, key=lambda r: r.total_price, reverse=self.reverse)

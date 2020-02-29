@@ -6,4 +6,4 @@ RUN pip3 install -r requirements.txt
 WORKDIR /app
 ADD . /app
 
-CMD python3 /app/run.py
+CMD python3 /app/core/run.py

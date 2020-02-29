@@ -32,8 +32,8 @@ class FlightSerializer(Schema):
 
 
 class RouteSerializer(Schema):
-    departure = fields.Str()
-    arrival = fields.Str()
+    departure = fields.DateTime()
+    arrival = fields.DateTime()
     total_price = fields.Float()
     total_duration = fields.Int()
     number_of_flights = fields.Int(attribute='number_of_flights')

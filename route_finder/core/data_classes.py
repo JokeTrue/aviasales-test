@@ -46,21 +46,21 @@ class Route:
                f'>'
 
     @property
-    def total_duration(self):
+    def total_duration(self) -> float:
         return sum(map(lambda f: f.duration, self.flights))
 
     @property
-    def total_price(self):
+    def total_price(self) -> Decimal:
         return round(sum(map(lambda f: f.price.amount, self.flights)), 2)
 
     @property
-    def departure(self):
+    def departure(self) -> datetime:
         return self.flights[0].departure
 
     @property
-    def arrival(self):
+    def arrival(self) -> datetime:
         return self.flights[-1].arrival
 
     @property
-    def number_of_flights(self):
+    def number_of_flights(self) -> int:
         return len(self.flights)
