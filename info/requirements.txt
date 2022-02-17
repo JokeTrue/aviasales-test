@@ -1,4 +1,4 @@
-sanic==19.9.0
+sanic==20.12.6
 flake8==3.7.1
 flake8-commas==2.0.0
 flake8-isort==2.6.0
